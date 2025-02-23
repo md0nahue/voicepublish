@@ -1,0 +1,12 @@
+#audioWaveform {
+    width: 600px;
+    height: 200px;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    margin-top: 20px;
+}
+
+#audioWaveform canvas {
+    width: 100%;
+    height: 100%;
+}

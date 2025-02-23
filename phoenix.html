@@ -1,0 +1,27 @@
+<html>
+
+<script>
+let socket = new WebSocket("ws://localhost:4000/socket/websocket");
+
+socket.onopen = function(e) {
+  console.log("Connection established!");
+};
+
+socket.onerror = function(error) {
+  console.log(`[error] ${error.message}`);
+};
+
+// Set up MediaRecorder to capture audio
+navigator.mediaDevices.getUserMedia({ audio: true })
+  .then(stream => {
+    const mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.start();
+
+    mediaRecorder.ondataavailable = function(e) {
+      socket.send(e.data);
+    }
+  })
+  .catch(error => console.error("Error accessing media devices.", error));
+</script>
+
+</html>
