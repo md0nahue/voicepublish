@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audio Streamer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            text-align: center;
+            padding: 50px;
+        }
+        #status {
+            font-size: 24px;
+            color: #ff0000;
+            margin-bottom: 20px;
+        }
+        #waveform {
+            width: 80%;
+            height: 200px;
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="status">Initializing...</div>
+    <canvas id="waveform"></canvas>
+
+    <script>
+        // WebSocket URL
+        const WEBSOCKET_URL = 'ws://localhost:8000/ws'; // Update with your server address
+
+        // UI Elements
+        const statusEl = document.getElementById('status');
+        const canvas = document.getElementById('waveform');
+        const canvasCtx = canvas.getContext('2d');
+
+        // Audio and WebSocket Variables
+        let mediaRecorder;
+        let audioStream;
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let websocket;
+        let animationId;
+
+        // Function to initialize MediaRecorder
+        function initializeMediaRecorder(stream) {
+            let options = { mimeType: 'audio/webm;codecs=opus' };
+
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+                    options.mimeType = 'audio/ogg;codecs=opus';
+                } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                    options.mimeType = 'audio/webm';
+                } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+                    options.mimeType = 'audio/ogg';
+                } else {
+                    options = {}; // Let the browser choose the default
+                }
+            }
+
+            try {
+                return new MediaRecorder(stream, options);
+            } catch (e) {
+                console.error('Exception while creating MediaRecorder:', e);
+                throw e;
+            }
+        }
+
+        // Initialize WebSocket connection
+        function connectWebSocket() {
+            websocket = new WebSocket(WEBSOCKET_URL);
+
+            websocket.onopen = () => {
+                console.log("WebSocket connected.");
+                statusEl.textContent = 'Connected to WebSocket!';
+                statusEl.style.color = '#28a745';
+            };
+
+            websocket.onerror = (error) => {
+                console.error("WebSocket error:", error);
+                statusEl.textContent = 'WebSocket error!';
+                statusEl.style.color = '#dc3545';
+            };
+
+            websocket.onclose = () => {
+                console.warn("WebSocket closed. Attempting to reconnect...");
+                statusEl.textContent = 'Reconnecting...';
+                statusEl.style.color = '#ff0000';
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        // Initialize the application
+        async function init() {
+            try {
+                // Connect to WebSocket
+                connectWebSocket();
+
+                // Request microphone access
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                statusEl.textContent = 'Recording now!';
+                statusEl.style.color = '#28a745';
+
+                // Setup Audio Context for waveform visualization
+                setupAudioContext(audioStream);
+
+                // Start Visualizing
+                visualize();
+
+                // Setup MediaRecorder
+                setupMediaRecorder(audioStream);
+
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                statusEl.textContent = 'Microphone access denied.';
+                statusEl.style.color = '#dc3545';
+            }
+        }
+
+        // Setup Audio Context and Analyser for waveform
+        function setupAudioContext(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(stream);
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 2048;
+            dataArray = new Uint8Array(analyser.fftSize);
+            source.connect(analyser);
+
+            // Resize canvas
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth * 0.8;
+            canvas.height = 200;
+        }
+
+        function visualize() {
+            function draw() {
+                animationId = requestAnimationFrame(draw);
+
+                analyser.getByteTimeDomainData(dataArray);
+
+                canvasCtx.fillStyle = '#ffffff';
+                canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+                canvasCtx.lineWidth = 2;
+                canvasCtx.strokeStyle = '#007bff';
+
+                canvasCtx.beginPath();
+
+                const sliceWidth = canvas.width / dataArray.length;
+                let x = 0;
+
+                for (let i = 0; i < dataArray.length; i++) {
+                    const v = dataArray[i] / 128.0;
+                    const y = v * canvas.height / 2;
+
+                    if (i === 0) {
+                        canvasCtx.moveTo(x, y);
+                    } else {
+                        canvasCtx.lineTo(x, y);
+                    }
+
+                    x += sliceWidth;
+                }
+
+                canvasCtx.lineTo(canvas.width, canvas.height / 2);
+                canvasCtx.stroke();
+            }
+
+            draw();
+        }
+
+        function setupMediaRecorder(stream) {
+            try {
+                mediaRecorder = initializeMediaRecorder(stream);
+            } catch (e) {
+                statusEl.textContent = 'MediaRecorder not supported.';
+                statusEl.style.color = '#dc3545';
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0 && websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(event.data);
+                    console.log("Sent audio chunk to WebSocket");
+                }
+            };
+
+            mediaRecorder.onstart = () => {
+                console.log('MediaRecorder started');
+            };
+
+            mediaRecorder.onstop = () => {
+                console.log('MediaRecorder stopped');
+            };
+
+            mediaRecorder.onerror = (event) => {
+                console.error('MediaRecorder error:', event.error);
+                statusEl.textContent = 'Recording error.';
+                statusEl.style.color = '#dc3545';
+            };
+
+            // Start recording and send data every 5 seconds
+            mediaRecorder.start(5000);
+            console.log('Recording started in 5-second chunks.');
+        }
+
+        // Start the application
+        window.addEventListener('load', init);
+
+        // Handle cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            if (audioContext) {
+                audioContext.close();
+            }
+            if (websocket) {
+                websocket.close();
+            }
+        });
+    </script>
+</body>
+</html>
