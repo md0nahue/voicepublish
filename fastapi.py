@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
 import boto3
 from botocore.exceptions import NoCredentialsError
@@ -5,10 +6,10 @@ import asyncio
 import uuid
 
 # AWS S3 Configuration
-AWS_ACCESS_KEY_ID = "your_access_key"
-AWS_SECRET_ACCESS_KEY = "your_secret_key"
-S3_BUCKET_NAME = "your_s3_bucket_name"
-S3_REGION = "your_s3_region"
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+S3_REGION = os.getenv("S3_REGION") 
 
 # Initialize S3 client
 s3_client = boto3.client(
