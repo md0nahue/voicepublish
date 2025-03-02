@@ -59,7 +59,36 @@ async def multipart_upload_s3(websocket: WebSocket, file_key: str):
 
             except WebSocketDisconnect:
                 print(f"WebSocket disconnected, completing upload: {file_key}")
-                break
+
+                # Upload any remaining buffered data
+                if buffer:
+                    try:
+                        part_response = s3_client.upload_part(
+                            Bucket=S3_BUCKET_NAME,
+                            Key=file_key,
+                            PartNumber=part_number,
+                            UploadId=upload_id,
+                            Body=bytes(buffer)
+                        )
+                        part_etags.append({"ETag": part_response["ETag"], "PartNumber": part_number})
+                        print(f"Uploaded final part {part_number} ({len(buffer)} bytes) for {file_key}")
+                    except Exception as e:
+                        print(f"Failed to upload remaining data: {e}")
+
+                # Complete multipart upload
+                try:
+                    if part_etags:
+                        s3_client.complete_multipart_upload(
+                            Bucket=S3_BUCKET_NAME,
+                            Key=file_key,
+                            UploadId=upload_id,
+                            MultipartUpload={"Parts": part_etags}
+                        )
+                        print(f"Upload completed: {file_key}")
+                    else:
+                        print("No parts uploaded, skipping completion.")
+                except Exception as e:
+                    print(f"Error completing upload: {e}")
 
         # Step 3: Upload Remaining Buffer (If Any)
         if buffer:
