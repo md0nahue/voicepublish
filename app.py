@@ -1,9 +1,12 @@
 import os
 import asyncio
 import uuid
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 import boto3
 from botocore.exceptions import NoCredentialsError, BotoCoreError, ClientError
+from fastapi.templating import Jinja2Templates
+
+templates = Jinja2Templates(directory="templates")
 
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
@@ -129,6 +132,10 @@ async def multipart_upload_s3(websocket: WebSocket, file_key: str):
                 s3_client.abort_multipart_upload(Bucket=S3_BUCKET_NAME, Key=file_key, UploadId=upload_id)
                 print(f"Upload aborted: {file_key}")
 
+@app.get("/")
+async def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -139,6 +146,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
     # Stream directly to S3 using Multipart Upload with proper buffering
     await multipart_upload_s3(websocket, file_key)
+
+@app.post("/submit")
+async def handle_form(request: Request, user_input: str = Form(...)):
+    pdb.set_trace()  # This will pause execution for debugging
+    return {"message": "Form received!", "user_input": user_input}
 
 if __name__ == "__main__":
     import uvicorn

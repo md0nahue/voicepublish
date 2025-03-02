@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Task Form</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-gray-100">
+    <div class="bg-white shadow-lg rounded-xl p-6 w-full max-w-md">
+        <h2 class="text-2xl font-bold text-center mb-4">What do you want the AI to ask you about?</h2>
+        <form action="/submit" method="post" class="space-y-4">
+            <textarea 
+                name="user_input" 
+                class="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400"
+                placeholder="Type your request here..."
+                required></textarea>
+            <button 
+                type="submit" 
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded-lg transition duration-200">
+                Submit
+            </button>
+        </form>
+    </div>
+</body>
+</html>

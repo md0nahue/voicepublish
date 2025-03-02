@@ -2,3 +2,6 @@ boto3==1.36.26
 botocore
 uvicorn==0.34.0
 fastapi
+jinja2
+sqlalchemy
+openai
